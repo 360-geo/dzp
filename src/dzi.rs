@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn test_info() {
         let path = PathBuf::from(format!("{}/test_data/test.jpg", env!("CARGO_MANIFEST_DIR")));
-        let ic = TileCreator::new_from_image_path(path.as_path(), 254, 1);
+        let ic = TileCreator::new_from_image_path(path.as_path(), 254, 1, None);
         assert!(ic.is_ok());
         let ic = ic.unwrap();
         assert_eq!(ic.levels, 14);

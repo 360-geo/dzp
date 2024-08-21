@@ -1,11 +1,17 @@
 mod dzi;
 
-use image::{Rgb, RgbImage};
+use image::{RgbImage};
 use std::f64::consts::PI;
+use std::fmt::format;
+use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
 use dzi::TileCreator;
 use rayon::prelude::*;
-use image::imageops::{interpolate_bilinear, interpolate_nearest, tile};
+use image::imageops::{interpolate_bilinear, interpolate_nearest};
+use mktemp::Temp;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
 fn mod_2pi(x: f64) -> f64 {
     ((x % (2.0 * PI)) + 2.0 * PI) % (2.0 * PI)
@@ -24,12 +30,12 @@ enum Face {
 impl Face {
     fn suffix(&self) -> &'static str {
         match *self {
-            Face::Back => "back",
-            Face::Down => "down",
-            Face::Front => "front",
-            Face::Left => "left",
-            Face::Right => "right",
-            Face::Up => "up",
+            Face::Back => "b",
+            Face::Down => "d",
+            Face::Front => "f",
+            Face::Left => "l",
+            Face::Right => "r",
+            Face::Up => "u",
         }
     }
 }
@@ -96,10 +102,12 @@ fn main() {
     use std::time::Instant;
 
     let now = Instant::now();
-    let src = image::open("/Users/george/Downloads/panos/recording_2024-07-30_04-51-55_00002.jpg").unwrap().to_rgb8();
+
+    let src = image::open("/Users/george/Downloads/dzp_test/recording_2024-06-28_05-32-06_00030.jpg").unwrap().to_rgb8();
+    let temp_path = Temp::new_dir().unwrap();
     let face_size = src.width() / 4;
-    faces.par_iter().for_each(|face| {
-        let output_path = format!("/Users/george/Downloads/panos/100mpix_bilinear/{}.jpg", face.suffix());
+    faces.clone().par_iter().for_each(|face| {
+        let output_path = format!("{}/{}.jpg", temp_path.clone().to_str().unwrap(), face.suffix());
         let result = render_face(&src, *face, face_size);
         result.save(&output_path).unwrap();
 
@@ -110,6 +118,44 @@ fn main() {
         creator.create_tiles().unwrap();
     });
 
+    let dzp = File::create("/Users/george/Downloads/dzp_test/recording_2024-06-28_05-32-06_00030.dzp").unwrap();
+    let mut dzp_writer = ZipWriter::new(dzp);
+    let dzp_writer_options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Stored)
+        .unix_permissions(0o755);
+    let mut buffer = Vec::new();
+
+    // we need to add the generated files (example: `b_files/0/0_0.jpg`) to the zip file
+
+    for face in faces {
+        let face_dir_name = format!("{}_files", face.suffix());
+        let face_dir = temp_path.clone().join(&face_dir_name);
+
+        for entry in std::fs::read_dir(&face_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_dir() {
+                let level = path.file_name().unwrap();
+                let level_dir = face_dir.join(&level);
+                for entry in std::fs::read_dir(level_dir).unwrap() {
+                    let entry = entry.unwrap();
+                    let path = entry.path();
+                    if path.extension().unwrap() == "jpg" {
+                        // we have jpg
+                        let tile = format!("{}/{}/{}", &face_dir_name, level.to_str().unwrap(), path.file_name().unwrap().to_str().unwrap());
+
+                        dzp_writer.start_file(&tile, dzp_writer_options).unwrap();
+                        let mut f = File::open(path).unwrap();
+                        f.read_to_end(&mut buffer).unwrap();
+                        dzp_writer.write_all(&buffer).unwrap();
+                        buffer.clear();
+                        println!("added {} to the dzp", tile)
+                    }
+                }
+
+            }
+        }
+    }
     // now that we have all the temp folders, lets combine them into an uncompressed zip
 
     let elapsed = now.elapsed();
