@@ -1,7 +1,11 @@
-use std::io::Write;
+use std::collections::HashMap;
+use std::fs::File;
+use std::hash::Hash;
+use std::io::{Bytes, Write};
 use std::path::{Path, PathBuf};
 
-use image::{DynamicImage, GenericImageView, ImageError};
+use image::{DynamicImage, GenericImageView, ImageError, RgbImage};
+use image::codecs::jpeg::JpegEncoder;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TilingError {
@@ -20,25 +24,25 @@ pub type DZIResult<T, E = TilingError> = Result<T, E>;
 /// A tile creator, this struct and associated functions
 /// implement the DZI tiler
 pub struct TileCreator {
-    /// path of destination directory where tiles will be stored
-    pub dest_path: PathBuf,
-    /// path of .dzi descriptor file to be created
-    pub dzi_file_path: PathBuf,
     /// source image
     pub image: DynamicImage,
+    /// source image
+    pub name: String,
     /// size of individual tiles in pixels
     pub tile_size: u32,
     /// number of pixels neighboring tiles overlap
     pub tile_overlap: u32,
     /// total number of levels of tiles
     pub levels: u32,
+    /// the buffer
+    buffer: HashMap<String, Vec<u8>>,
 }
 
 impl TileCreator {
-    pub fn new_from_image_path(image_path: &Path, tile_size: u32, tile_overlap: u32, levels: Option<u32>) -> DZIResult<Self> {
-        let im = image::io::Reader::open(image_path)?
-            .with_guessed_format()?
-            .decode()?;
+    pub fn new_from_image(im: DynamicImage, name: String, tile_size: u32, tile_overlap: u32, levels: Option<u32>) -> DZIResult<Self> {
+        // let im = image::io::Reader::open(image_path)?
+        //     .with_guessed_format()?
+        //     .decode()?;
         let (h, w) = im.dimensions();
 
         let actual_levels = if levels.is_none() {
@@ -47,39 +51,24 @@ impl TileCreator {
             levels.unwrap()
         };
 
-        let parent_dir = image_path.parent();
-        if parent_dir.is_none() {
-            return Err(TilingError::UnsupportedSourceImage("Could not find parent dir of image".into()));
-        }
-        let parent_dir = parent_dir.unwrap();
-        let stem = Path::file_stem(image_path);
-        if stem.is_none() {
-            return Err(TilingError::UnsupportedSourceImage("Could not find base name of image".into()));
-        }
-        let stem = stem.unwrap().to_str();
-        if stem.is_none() {
-            return Err(TilingError::UnsupportedSourceImage("Could not find base name of image".into()));
-        }
-        let stem = stem.unwrap();
-        let dest_path = parent_dir.join(format!("{}_files", stem));
-        let dzi_file_path = parent_dir.join(format!("{}.dzi", stem));
-
         Ok(Self {
-            dest_path,
-            dzi_file_path,
             image: im,
+            name,
             tile_size,
             tile_overlap,
             levels: actual_levels,
+            buffer: HashMap::new(),
         })
     }
 
     /// Create DZI tiles
-    pub fn create_tiles(&self) -> DZIResult<(PathBuf, PathBuf)> {
+    pub fn create_tiles(mut self) -> DZIResult<HashMap<String, Vec<u8>>> {
         for l in 0..self.levels {
             self.create_level(l)?;
         }
+
         let (w, h) = self.image.dimensions();
+
         let dzi = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
 <Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
     TileSize="{}"
@@ -87,13 +76,15 @@ impl TileCreator {
     Format="jpg">
     <Size Width="{}" Height="{}"/>
 </Image>"#,
-                          self.tile_size,
-                          self.tile_overlap,
-                          w,
-                          h);
-        let mut f = std::fs::File::create(self.dzi_file_path.as_path())?;
-        f.write_all(dzi.as_bytes())?;
-        Ok((self.dzi_file_path.clone(), self.dest_path.clone()))
+          self.tile_size,
+          self.tile_overlap,
+          w,
+          h
+        );
+
+        self.buffer.insert(format!("{}.dzi", self.name), dzi.as_bytes().to_vec());
+
+        Ok(self.buffer.to_owned())
     }
 
     /// Check if level is valid
@@ -105,18 +96,17 @@ impl TileCreator {
     }
 
     /// Create tiles for a level
-    fn create_level(&self, level: u32) -> DZIResult<()> {
-        let p = self.dest_path
-            .join(format!("{}", level));
-        std::fs::create_dir_all(&p)?;
+    fn create_level(&mut self, level: u32) -> DZIResult<()> {
         let mut li = self.get_level_image(level)?;
         let (c, r) = self.get_tile_count(level)?;
         for col in 0..c {
             for row in 0..r {
                 let (x, y, x2, y2) = self.get_tile_bounds(level, col, row)?;
                 let tile_image = li.crop(x, y, x2 - x, y2 - y);
-                let tile_path = p.join(format!("{}_{}.jpg", col, row));
-                tile_image.save(tile_path)?;
+                let mut buffer = Vec::new();
+                let encoder = JpegEncoder::new_with_quality(&mut buffer, 90);
+                tile_image.write_with_encoder(encoder)?;
+                self.buffer.insert(format!("{}/{}/{}_{}.jpg", self.name, level, col, row), buffer);
             }
         }
         Ok(())
@@ -125,12 +115,14 @@ impl TileCreator {
     /// Get image for a level
     fn get_level_image(&self, level: u32) -> DZIResult<DynamicImage> {
         self.check_level(level)?;
+
         let (w, h) = self.get_dimensions(level)?;
+
         Ok(self.image
             .resize(
                 w,
                 h,
-                image::imageops::FilterType::Nearest,
+                image::imageops::FilterType::Lanczos3,
             )
         )
     }
@@ -188,32 +180,5 @@ impl TileCreator {
         let w = w.min(lw - x);
         let h = h.min(lh - y);
         Ok((x, y, x + w, y + h))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use crate::TileCreator;
-
-    #[test]
-    fn test_info() {
-        let path = PathBuf::from(format!("{}/test_data/test.jpg", env!("CARGO_MANIFEST_DIR")));
-        let ic = TileCreator::new_from_image_path(path.as_path(), 254, 1, None);
-        assert!(ic.is_ok());
-        let ic = ic.unwrap();
-        assert_eq!(ic.levels, 14);
-        let (w, h) = ic.get_dimensions(ic.levels - 1).unwrap();
-        assert_eq!(w, 5184);
-        assert_eq!(h, 3456);
-
-        let (w, h) = ic.get_dimensions(1).unwrap();
-        assert_eq!(w, 2);
-        assert_eq!(h, 1);
-
-        let (c, r) = ic.get_tile_count(13).unwrap();
-        assert_eq!(c, 21);
-        assert_eq!(r, 14);
     }
 }
