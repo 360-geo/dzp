@@ -10,7 +10,7 @@ use crate::dzi::TileCreator;
 use rayon::prelude::*;
 use std::io::prelude::*;
 
-pub mod dzi;
+mod dzi;
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Face {
@@ -61,6 +61,7 @@ pub struct DzpConverter {
 }
 
 impl DzpConverter {
+    /// Create an instance of the converter
     pub fn create() -> Self {
         Self {
             face_size_cache: HashMap::new(),
@@ -75,6 +76,7 @@ impl DzpConverter {
         }
     }
 
+    /// Convert an image into a dzp, and return the bytes of the container as a vector
     pub fn convert_image(&mut self, image: &DynamicImage) -> Vec<u8> {
         let resolution = (image.width(), image.height());
         assert_eq!(resolution.0, resolution.1 * 2);
