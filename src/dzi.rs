@@ -101,7 +101,7 @@ impl TileCreator {
                 let mut buffer = Vec::new();
                 let encoder = JpegEncoder::new_with_quality(&mut buffer, 90);
                 tile_image.write_with_encoder(encoder)?;
-                self.buffer.insert(format!("{}/{}/{}_{}.jpg", self.name, level, col, row), buffer);
+                self.buffer.insert(format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row), buffer);
             }
         }
         Ok(())
