@@ -1,7 +1,12 @@
 [package]
 name = "dzp"
+description = "Create DZP's from JPG's"
+documentation = "https://docs.rs/bitflags"
+readme = "README.md"
+repository = "https://github.com/360-geo/dzp"
 version = "0.1.0"
 edition = "2021"
+authors = ["George Boot <george@360geo.nl>"]
 
 [dependencies]
 image = "0.25"
