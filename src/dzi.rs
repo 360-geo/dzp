@@ -1,10 +1,5 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::hash::Hash;
-use std::io::{Bytes, Write};
-use std::path::{Path, PathBuf};
-
-use image::{DynamicImage, GenericImageView, ImageError, RgbImage};
+use image::{DynamicImage, GenericImageView, ImageError};
 use image::codecs::jpeg::JpegEncoder;
 
 #[derive(thiserror::Error, Debug)]
