@@ -9,6 +9,7 @@ use zip::{CompressionMethod, ZipWriter};
 use crate::dzi::TileCreator;
 use rayon::prelude::*;
 use std::io::prelude::*;
+use std::sync::{Arc, RwLock};
 
 mod dzi;
 
@@ -53,7 +54,7 @@ struct PixelMapping {
 }
 type PixelCoordinateCache = Vec<PixelMapping>;
 type FaceCache = HashMap<Face, PixelCoordinateCache>;
-type FaceSizeCache = HashMap<u32, FaceCache>;
+type FaceSizeCache = Arc<RwLock<HashMap<u32, FaceCache>>>;
 
 pub struct DzpConverter {
     face_size_cache: FaceSizeCache,
@@ -64,7 +65,7 @@ impl DzpConverter {
     /// Create an instance of the converter
     pub fn create() -> Self {
         Self {
-            face_size_cache: HashMap::new(),
+            face_size_cache: Arc::new(RwLock::new(HashMap::new())),
             faces: [
                 Face::Front,
                 Face::Back,
@@ -77,28 +78,39 @@ impl DzpConverter {
     }
 
     /// Convert an image into a dzp, and return the bytes of the container as a vector
-    pub fn convert_image(&mut self, image: &DynamicImage) -> Vec<u8> {
+    pub fn convert_image(&self, image: &DynamicImage) -> Vec<u8> {
         let resolution = (image.width(), image.height());
         assert_eq!(resolution.0, resolution.1 * 2);
 
-        if !self.face_size_cache.contains_key(&resolution.0) {
+        let should_generate_cache;
+        {
+            let cache = self.face_size_cache.read().unwrap();
+            should_generate_cache = !cache.contains_key(&resolution.0);
+        }
+
+        if should_generate_cache {
             self.generate_cache_for_resolution(resolution.0);
         }
 
-        let face_cache = self.face_size_cache.get(&resolution.0).unwrap();
+        let file_systems;
+        {
+            let cache = self.face_size_cache.read().unwrap();
+            let face_cache = cache.get(&resolution.0).unwrap();
 
-        let face_size = image.width() / 4;
-        let file_systems = self.faces.clone().par_iter().map(|face| {
-            let pixel_coordinate_cache = face_cache.get(&face).unwrap();
-            let result = self.render_face(&image, face_size, pixel_coordinate_cache);
 
-            // dzi it
-            let tile_size = 512;
-            let levels = (face_size as f64 / tile_size as f64).sqrt().ceil() as u32 + 1;
-            let creator = TileCreator::new_from_image(result, face.suffix().to_string(), 512, 0, Some(levels)).unwrap();
+            let face_size = image.width() / 4;
+            file_systems = self.faces.clone().par_iter().map(|face| {
+                let pixel_coordinate_cache = face_cache.get(&face).unwrap();
+                let result = self.render_face(&image, face_size, pixel_coordinate_cache);
 
-            creator.create_tiles().unwrap()
-        }).collect::<Vec<HashMap<String, Vec<u8>>>>();
+                // dzi it
+                let tile_size = 512;
+                let levels = (face_size as f64 / tile_size as f64).sqrt().ceil() as u32 + 1;
+                let creator = TileCreator::new_from_image(result, face.suffix().to_string(), 512, 0, Some(levels)).unwrap();
+
+                creator.create_tiles().unwrap()
+            }).collect::<Vec<HashMap<String, Vec<u8>>>>();
+        }
 
         let mut buffer = Cursor::new(Vec::new());
 
@@ -143,7 +155,7 @@ impl DzpConverter {
         dst
     }
 
-    fn generate_cache_for_resolution(&mut self, width: u32) {
+    fn generate_cache_for_resolution(&self, width: u32) {
         let height = width / 2;
         let face_size = width / 4;
 
@@ -179,7 +191,10 @@ impl DzpConverter {
             face_cache.insert(face, pixel_coordinate_cache);
         }
 
-        self.face_size_cache.insert(width, face_cache);
+        {
+            let mut cache = self.face_size_cache.write().unwrap();
+            cache.insert(width, face_cache);
+        }
     }
 }
 
