@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use image::{DynamicImage, GenericImageView, ImageError};
 use image::codecs::jpeg::JpegEncoder;
+use image::{DynamicImage, GenericImageView, ImageError};
+use std::collections::HashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TilingError {
@@ -34,7 +34,13 @@ pub struct TileCreator {
 }
 
 impl TileCreator {
-    pub fn new_from_image(im: DynamicImage, name: String, tile_size: u32, tile_overlap: u32, levels: Option<u32>) -> DZIResult<Self> {
+    pub fn new_from_image(
+        im: DynamicImage,
+        name: String,
+        tile_size: u32,
+        tile_overlap: u32,
+        levels: Option<u32>,
+    ) -> DZIResult<Self> {
         // let im = image::io::Reader::open(image_path)?
         //     .with_guessed_format()?
         //     .decode()?;
@@ -64,20 +70,19 @@ impl TileCreator {
 
         let (w, h) = self.image.dimensions();
 
-        let dzi = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+        let dzi = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
 <Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
     TileSize="{}"
     Overlap="{}"
     Format="jpg">
     <Size Width="{}" Height="{}"/>
 </Image>"#,
-          self.tile_size,
-          self.tile_overlap,
-          w,
-          h
+            self.tile_size, self.tile_overlap, w, h
         );
 
-        self.buffer.insert(format!("{}.dzi", self.name), dzi.as_bytes().to_vec());
+        self.buffer
+            .insert(format!("{}.dzi", self.name), dzi.as_bytes().to_vec());
 
         Ok(self.buffer.to_owned())
     }
@@ -101,7 +106,10 @@ impl TileCreator {
                 let mut buffer = Vec::new();
                 let encoder = JpegEncoder::new_with_quality(&mut buffer, 90);
                 tile_image.write_with_encoder(encoder)?;
-                self.buffer.insert(format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row), buffer);
+                self.buffer.insert(
+                    format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row),
+                    buffer,
+                );
             }
         }
         Ok(())
@@ -113,13 +121,9 @@ impl TileCreator {
 
         let (w, h) = self.get_dimensions(level)?;
 
-        Ok(self.image
-            .resize(
-                w,
-                h,
-                image::imageops::FilterType::Lanczos3,
-            )
-        )
+        Ok(self
+            .image
+            .resize(w, h, image::imageops::FilterType::Lanczos3))
     }
 
     /// Get scale factor at level
@@ -146,31 +150,16 @@ impl TileCreator {
         Ok((cols, rows))
     }
 
-    fn get_tile_bounds(
-        &self,
-        level: u32,
-        col: u32,
-        row: u32,
-    ) -> DZIResult<(u32, u32, u32, u32)> {
-        let offset_x = if col == 0 {
-            0
-        } else {
-            self.tile_overlap
-        };
-        let offset_y = if row == 0 {
-            0
-        } else {
-            self.tile_overlap
-        };
+    fn get_tile_bounds(&self, level: u32, col: u32, row: u32) -> DZIResult<(u32, u32, u32, u32)> {
+        let offset_x = if col == 0 { 0 } else { self.tile_overlap };
+        let offset_y = if row == 0 { 0 } else { self.tile_overlap };
         let x = col * self.tile_size - offset_x;
         let y = row * self.tile_size - offset_y;
 
         let (lw, lh) = self.get_dimensions(level)?;
 
-        let w = self.tile_size +
-            (if col == 0 { 1 } else { 2 }) * self.tile_overlap;
-        let h = self.tile_size +
-            (if row == 0 { 1 } else { 2 }) * self.tile_overlap;
+        let w = self.tile_size + (if col == 0 { 1 } else { 2 }) * self.tile_overlap;
+        let h = self.tile_size + (if row == 0 { 1 } else { 2 }) * self.tile_overlap;
 
         let w = w.min(lw - x);
         let h = h.min(lh - y);

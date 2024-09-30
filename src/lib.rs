@@ -1,15 +1,15 @@
+use image::{DynamicImage, GenericImage};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::io::Cursor;
-use image::{DynamicImage, GenericImage};
 // use image::imageops::interpolate_nearest as interpolate_fn;
-use image::imageops::interpolate_bilinear as interpolate_fn;
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
 use crate::dzi::TileCreator;
+use image::imageops::interpolate_bilinear as interpolate_fn;
 use rayon::prelude::*;
 use std::io::prelude::*;
 use std::sync::{Arc, RwLock};
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
 mod dzi;
 
@@ -97,19 +97,30 @@ impl DzpConverter {
             let cache = self.face_size_cache.read().unwrap();
             let face_cache = cache.get(&resolution.0).unwrap();
 
-
             let face_size = image.width() / 4;
-            file_systems = self.faces.clone().par_iter().map(|face| {
-                let pixel_coordinate_cache = face_cache.get(&face).unwrap();
-                let result = self.render_face(&image, face_size, pixel_coordinate_cache);
+            file_systems = self
+                .faces
+                .clone()
+                .par_iter()
+                .map(|face| {
+                    let pixel_coordinate_cache = face_cache.get(face).unwrap();
+                    let result = self.render_face(image, face_size, pixel_coordinate_cache);
 
-                // dzi it
-                let tile_size = 512;
-                let levels = (face_size as f64 / tile_size as f64).sqrt().ceil() as u32 + 1;
-                let creator = TileCreator::new_from_image(result, face.suffix().to_string(), 512, 0, Some(levels)).unwrap();
+                    // dzi it
+                    let tile_size = 512;
+                    let levels = (face_size as f64 / tile_size as f64).sqrt().ceil() as u32 + 1;
+                    let creator = TileCreator::new_from_image(
+                        result,
+                        face.suffix().to_string(),
+                        512,
+                        0,
+                        Some(levels),
+                    )
+                    .unwrap();
 
-                creator.create_tiles().unwrap()
-            }).collect::<Vec<HashMap<String, Vec<u8>>>>();
+                    creator.create_tiles().unwrap()
+                })
+                .collect::<Vec<HashMap<String, Vec<u8>>>>();
         }
 
         let mut buffer = Cursor::new(Vec::new());
@@ -149,7 +160,11 @@ impl DzpConverter {
                 pixel_mapping.source_coordinate.1,
             );
 
-            dst.put_pixel(pixel_mapping.face_coordinate.0, pixel_mapping.face_coordinate.1, colour.unwrap());
+            dst.put_pixel(
+                pixel_mapping.face_coordinate.0,
+                pixel_mapping.face_coordinate.1,
+                colour.unwrap(),
+            );
         }
 
         dst
@@ -182,7 +197,7 @@ impl DzpConverter {
 
                     let mapping = PixelMapping {
                         source_coordinate: (src_x as f32, src_y as f32),
-                        face_coordinate: (x, y)
+                        face_coordinate: (x, y),
                     };
 
                     pixel_coordinate_cache.push(mapping);

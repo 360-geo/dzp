@@ -1,20 +1,20 @@
+use clap::Parser;
+use dzp::DzpConverter;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
-use clap::Parser;
-use dzp::{DzpConverter};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     /// Source path for the .jpg files
-    #[arg(short,long)]
+    #[arg(short, long)]
     input_path: PathBuf,
 
     /// Destination path for the .dzp files
-    #[arg(short,long)]
+    #[arg(short, long)]
     output_path: PathBuf,
 }
 
@@ -34,12 +34,14 @@ pub fn main() {
         })
         .collect();
 
-    let mut dzp_converter = DzpConverter::create();
+    let dzp_converter = DzpConverter::create();
 
     for jpg_path in jpg_files {
         let now = Instant::now();
 
-        let dzp_path = args.output_path.join(jpg_path.with_extension("dzp").file_name().unwrap());
+        let dzp_path = args
+            .output_path
+            .join(jpg_path.with_extension("dzp").file_name().unwrap());
 
         let image = image::open(jpg_path).unwrap();
 
@@ -50,6 +52,10 @@ pub fn main() {
 
         let elapsed = now.elapsed();
 
-        println!("Created {} in {:.3}s", dzp_path.file_name().unwrap().to_string_lossy(), elapsed.as_secs_f64());
+        println!(
+            "Created {} in {:.3}s",
+            dzp_path.file_name().unwrap().to_string_lossy(),
+            elapsed.as_secs_f64()
+        );
     }
 }
