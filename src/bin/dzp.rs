@@ -43,7 +43,8 @@ pub fn main() {
             .output_path
             .join(jpg_path.with_extension("dzp").file_name().unwrap());
 
-        let image = image::open(jpg_path).unwrap();
+        let jpeg_data = std::fs::read(jpg_path).unwrap();
+        let image: image::RgbImage = turbojpeg::decompress_image(&jpeg_data).unwrap();
 
         let dzp_bytes = dzp_converter.convert_image(&image);
 

@@ -1,8 +1,6 @@
-use image::{DynamicImage, GenericImage};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::io::Cursor;
-// use image::imageops::interpolate_nearest as interpolate_fn;
 use crate::dzi::TileCreator;
 use image::imageops::interpolate_bilinear as interpolate_fn;
 use rayon::prelude::*;
@@ -78,7 +76,7 @@ impl DzpConverter {
     }
 
     /// Convert an image into a dzp, and return the bytes of the container as a vector
-    pub fn convert_image(&self, image: &DynamicImage) -> Vec<u8> {
+    pub fn convert_image(&self, image: &image::RgbImage) -> Vec<u8> {
         let resolution = (image.width(), image.height());
         assert_eq!(resolution.0, resolution.1 * 2);
 
@@ -144,14 +142,14 @@ impl DzpConverter {
 
     fn render_face(
         &self,
-        src: &DynamicImage,
+        src: &image::RgbImage,
         max_width: u32,
         pixel_coordinate_cache: &PixelCoordinateCache,
-    ) -> DynamicImage {
+    ) -> image::RgbImage {
         let face_width = max_width.min(src.width() / 4);
         let face_height = face_width;
 
-        let mut dst = DynamicImage::new(face_width, face_height, src.color());
+        let mut dst = image::RgbImage::new(face_width, face_height);
 
         for pixel_mapping in pixel_coordinate_cache {
             let colour = interpolate_fn(

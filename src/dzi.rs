@@ -1,17 +1,17 @@
-use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageError};
+use image::{GenericImageView, ImageError};
 use std::collections::HashMap;
+use image::imageops::resize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TilingError {
-    #[error("Unsupported source image: {0}")]
-    UnsupportedSourceImage(String),
     #[error("Unexpected error")]
     UnexpectedError,
     #[error("Unsupported source image: {0}")]
     ImageError(#[from] ImageError),
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
+    #[error("TurboJpeg encoding error: {0}")]
+    TurboJpegError(#[from] turbojpeg::Error),
 }
 
 pub type DZIResult<T, E = TilingError> = Result<T, E>;
@@ -20,7 +20,7 @@ pub type DZIResult<T, E = TilingError> = Result<T, E>;
 /// implement the DZI tiler
 pub struct TileCreator {
     /// source image
-    pub image: DynamicImage,
+    pub image: image::RgbImage,
     /// source image
     pub name: String,
     /// size of individual tiles in pixels
@@ -35,7 +35,7 @@ pub struct TileCreator {
 
 impl TileCreator {
     pub fn new_from_image(
-        im: DynamicImage,
+        im: image::RgbImage,
         name: String,
         tile_size: u32,
         tile_overlap: u32,
@@ -97,18 +97,18 @@ impl TileCreator {
 
     /// Create tiles for a level
     fn create_level(&mut self, level: u32) -> DZIResult<()> {
-        let mut li = self.get_level_image(level)?;
+        let li = self.get_level_image(level)?;
         let (c, r) = self.get_tile_count(level)?;
         for col in 0..c {
             for row in 0..r {
                 let (x, y, x2, y2) = self.get_tile_bounds(level, col, row)?;
-                let tile_image = li.crop(x, y, x2 - x, y2 - y);
-                let mut buffer = Vec::new();
-                let encoder = JpegEncoder::new_with_quality(&mut buffer, 90);
-                tile_image.write_with_encoder(encoder)?;
+                // let tile_image = crop(&mut li, x, y, x2 - x, y2 - y);
+                let tile_image = li.view(x, y, x2 - x, y2 - y).to_image();
+
+                let buffer = turbojpeg::compress_image(&tile_image, 90, turbojpeg::Subsamp::Sub2x2)?;
                 self.buffer.insert(
                     format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row),
-                    buffer,
+                    buffer.to_vec(),
                 );
             }
         }
@@ -116,14 +116,12 @@ impl TileCreator {
     }
 
     /// Get image for a level
-    fn get_level_image(&self, level: u32) -> DZIResult<DynamicImage> {
+    fn get_level_image(&self, level: u32) -> DZIResult<image::RgbImage> {
         self.check_level(level)?;
 
         let (w, h) = self.get_dimensions(level)?;
 
-        Ok(self
-            .image
-            .resize(w, h, image::imageops::FilterType::Lanczos3))
+        Ok(resize(&self.image, w, h, image::imageops::FilterType::Lanczos3))
     }
 
     /// Get scale factor at level
