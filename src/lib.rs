@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::f64::consts::PI;
-use std::io::Cursor;
 use crate::dzi::TileCreator;
 use image::imageops::interpolate_bilinear as interpolate_fn;
 use rayon::prelude::*;
+use std::collections::HashMap;
+use std::f64::consts::PI;
 use std::io::prelude::*;
+use std::io::Cursor;
 use std::sync::{Arc, RwLock};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
@@ -54,6 +54,7 @@ type PixelCoordinateCache = Vec<PixelMapping>;
 type FaceCache = HashMap<Face, PixelCoordinateCache>;
 type FaceSizeCache = Arc<RwLock<HashMap<u32, FaceCache>>>;
 
+#[derive(Clone)]
 pub struct DzpConverter {
     face_size_cache: FaceSizeCache,
     faces: [Face; 6],
