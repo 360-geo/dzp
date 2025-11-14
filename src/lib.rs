@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-mod dzi;
+pub mod dzi;
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Face {

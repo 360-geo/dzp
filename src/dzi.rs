@@ -1,6 +1,6 @@
+use image::imageops::resize;
 use image::{GenericImageView, ImageError};
 use std::collections::HashMap;
-use image::imageops::resize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TilingError {
@@ -41,9 +41,6 @@ impl TileCreator {
         tile_overlap: u32,
         levels: Option<u32>,
     ) -> DZIResult<Self> {
-        // let im = image::io::Reader::open(image_path)?
-        //     .with_guessed_format()?
-        //     .decode()?;
         let (h, w) = im.dimensions();
 
         let actual_levels = if levels.is_none() {
@@ -105,7 +102,8 @@ impl TileCreator {
                 // let tile_image = crop(&mut li, x, y, x2 - x, y2 - y);
                 let tile_image = li.view(x, y, x2 - x, y2 - y).to_image();
 
-                let buffer = turbojpeg::compress_image(&tile_image, 90, turbojpeg::Subsamp::Sub2x2)?;
+                let buffer =
+                    turbojpeg::compress_image(&tile_image, 90, turbojpeg::Subsamp::Sub2x2)?;
                 self.buffer.insert(
                     format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row),
                     buffer.to_vec(),
@@ -121,7 +119,12 @@ impl TileCreator {
 
         let (w, h) = self.get_dimensions(level)?;
 
-        Ok(resize(&self.image, w, h, image::imageops::FilterType::Lanczos3))
+        Ok(resize(
+            &self.image,
+            w,
+            h,
+            image::imageops::FilterType::Lanczos3,
+        ))
     }
 
     /// Get scale factor at level
