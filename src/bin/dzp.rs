@@ -44,9 +44,12 @@ pub fn main() {
             .output_path
             .join(jpg_path.with_extension("dzp").file_name().unwrap());
 
-        let img = image::open(jpg_path).unwrap().to_rgb8();
+        let jpeg_data = std::fs::read(jpg_path).unwrap();
+        let image: image::RgbImage = turbojpeg::decompress_image(&jpeg_data).unwrap();
 
-        let dzp_bytes = dzp_converter.convert_image(&img);
+        let encoding_time = now.elapsed();
+
+        let dzp_bytes = dzp_converter.convert_image(&image);
 
         let mut dzp = File::create(&dzp_path).unwrap();
         dzp.write_all(&dzp_bytes).unwrap();
@@ -54,9 +57,10 @@ pub fn main() {
         let elapsed = now.elapsed();
 
         println!(
-            "Created {} in {:.3}s",
+            "Created {} in {:.3}s, jpeg decoding took {:.3}s",
             dzp_path.file_name().unwrap().to_string_lossy(),
-            elapsed.as_secs_f64()
+            elapsed.as_secs_f64(),
+            encoding_time.as_secs_f64(),
         );
     }
 }

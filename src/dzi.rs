@@ -111,7 +111,7 @@ impl TileCreator {
 
                 let buffer = webp::Encoder::from_image(&tile_image.into())
                     .map_err(TilingError::from)?
-                    .encode(90.0);
+                    .encode(80.0);
                 self.buffer.insert(
                     format!("{}_files/{}/{}_{}.webp", self.name, level, col, row),
                     buffer.to_vec(),
