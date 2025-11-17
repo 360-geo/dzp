@@ -19,5 +19,4 @@ anyhow = "1"
 thiserror = "1"
 zip = "2"
 clap = { version = "4.5.6", features = ["derive"] }
-turbojpeg = { version = "1.1.1", features = ["image"]}
-
+webp = "0.3.1"

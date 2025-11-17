@@ -21,7 +21,6 @@ struct Args {
 pub fn main() {
     let args = Args::parse();
 
-    // step 1: find all .jpg files in args.input_dir and iterate over them
     let jpg_files: Vec<_> = fs::read_dir(&args.input_path)
         .unwrap()
         .filter_map(|entry| {
@@ -36,6 +35,8 @@ pub fn main() {
 
     let dzp_converter = DzpConverter::create();
 
+    fs::create_dir_all(&args.output_path).unwrap();
+
     for jpg_path in jpg_files {
         let now = Instant::now();
 
@@ -43,10 +44,9 @@ pub fn main() {
             .output_path
             .join(jpg_path.with_extension("dzp").file_name().unwrap());
 
-        let jpeg_data = std::fs::read(jpg_path).unwrap();
-        let image: image::RgbImage = turbojpeg::decompress_image(&jpeg_data).unwrap();
+        let img = image::open(jpg_path).unwrap().to_rgb8();
 
-        let dzp_bytes = dzp_converter.convert_image(&image);
+        let dzp_bytes = dzp_converter.convert_image(&img);
 
         let mut dzp = File::create(&dzp_path).unwrap();
         dzp.write_all(&dzp_bytes).unwrap();
