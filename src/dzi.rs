@@ -50,11 +50,7 @@ impl TileCreator {
     ) -> DZIResult<Self> {
         let (h, w) = im.dimensions();
 
-        let actual_levels = if levels.is_none() {
-            (h.max(w) as f64).log2().ceil() as u32 + 1
-        } else {
-            levels.unwrap()
-        };
+        let actual_levels = levels.unwrap_or_else(|| (h.max(w) as f64).log2().ceil() as u32 + 1);
 
         Ok(Self {
             image: im,
