@@ -75,7 +75,7 @@ impl TileCreator {
 <Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
     TileSize="{}"
     Overlap="{}"
-    Format="jpg">
+    Format="webp">
     <Size Width="{}" Height="{}"/>
 </Image>"#,
             self.tile_size, self.tile_overlap, w, h
