@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::time::Instant;
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,7 +22,6 @@ struct Args {
 pub fn main() {
     let args = Args::parse();
 
-    // step 1: find all .jpg files in args.input_dir and iterate over them
     let jpg_files: Vec<_> = fs::read_dir(&args.input_path)
         .unwrap()
         .filter_map(|entry| {
@@ -36,6 +36,8 @@ pub fn main() {
 
     let dzp_converter = DzpConverter::create();
 
+    fs::create_dir_all(&args.output_path).unwrap();
+
     for jpg_path in jpg_files {
         let now = Instant::now();
 
@@ -46,6 +48,8 @@ pub fn main() {
         let jpeg_data = std::fs::read(jpg_path).unwrap();
         let image: image::RgbImage = turbojpeg::decompress_image(&jpeg_data).unwrap();
 
+        let encoding_time = now.elapsed();
+
         let dzp_bytes = dzp_converter.convert_image(&image);
 
         let mut dzp = File::create(&dzp_path).unwrap();
@@ -53,10 +57,11 @@ pub fn main() {
 
         let elapsed = now.elapsed();
 
-        println!(
-            "Created {} in {:.3}s",
+        info!(
+            "Created {} in {:.3}s, jpeg decoding took {:.3}s",
             dzp_path.file_name().unwrap().to_string_lossy(),
-            elapsed.as_secs_f64()
+            elapsed.as_secs_f64(),
+            encoding_time.as_secs_f64(),
         );
     }
 }

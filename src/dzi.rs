@@ -1,6 +1,7 @@
 use image::imageops::resize;
 use image::{GenericImageView, ImageError};
 use std::collections::HashMap;
+use webp;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TilingError {
@@ -10,8 +11,14 @@ pub enum TilingError {
     ImageError(#[from] ImageError),
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("TurboJpeg encoding error: {0}")]
-    TurboJpegError(#[from] turbojpeg::Error),
+    #[error("WebP error: {0}")]
+    WebPError(String),
+}
+
+impl From<&str> for TilingError {
+    fn from(s: &str) -> Self {
+        TilingError::WebPError(s.to_string())
+    }
 }
 
 pub type DZIResult<T, E = TilingError> = Result<T, E>;
@@ -43,11 +50,7 @@ impl TileCreator {
     ) -> DZIResult<Self> {
         let (h, w) = im.dimensions();
 
-        let actual_levels = if levels.is_none() {
-            (h.max(w) as f64).log2().ceil() as u32 + 1
-        } else {
-            levels.unwrap()
-        };
+        let actual_levels = levels.unwrap_or_else(|| (h.max(w) as f64).log2().ceil() as u32 + 1);
 
         Ok(Self {
             image: im,
@@ -72,7 +75,7 @@ impl TileCreator {
 <Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
     TileSize="{}"
     Overlap="{}"
-    Format="jpg">
+    Format="webp">
     <Size Width="{}" Height="{}"/>
 </Image>"#,
             self.tile_size, self.tile_overlap, w, h
@@ -102,10 +105,11 @@ impl TileCreator {
                 // let tile_image = crop(&mut li, x, y, x2 - x, y2 - y);
                 let tile_image = li.view(x, y, x2 - x, y2 - y).to_image();
 
-                let buffer =
-                    turbojpeg::compress_image(&tile_image, 90, turbojpeg::Subsamp::Sub2x2)?;
+                let buffer = webp::Encoder::from_image(&tile_image.into())
+                    .map_err(TilingError::from)?
+                    .encode(80.0);
                 self.buffer.insert(
-                    format!("{}_files/{}/{}_{}.jpg", self.name, level, col, row),
+                    format!("{}_files/{}/{}_{}.webp", self.name, level, col, row),
                     buffer.to_vec(),
                 );
             }
