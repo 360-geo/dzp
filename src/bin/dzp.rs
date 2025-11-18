@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::time::Instant;
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -56,7 +57,7 @@ pub fn main() {
 
         let elapsed = now.elapsed();
 
-        println!(
+        info!(
             "Created {} in {:.3}s, jpeg decoding took {:.3}s",
             dzp_path.file_name().unwrap().to_string_lossy(),
             elapsed.as_secs_f64(),
