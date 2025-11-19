@@ -9,16 +9,14 @@ edition = "2021"
 authors = ["George Boot <george@360geo.nl>"]
 
 [dependencies]
-image = "0.25"
+image = { version = "0.25.9", default-features = false, features = ["jpeg"]}
 nalgebra = "0.33"
 ndarray = "0.16"
 ndarray-stats = "0.5"
 rayon = "1.10"
-imageproc = "0.25"
-anyhow = "1"
 thiserror = "1"
 zip = "2"
 clap = { version = "4.5.6", features = ["derive"] }
-turbojpeg = { version = "1.1.1", features = ["image"]}
 webp = "0.3.1"
 tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }

@@ -1,11 +1,13 @@
 use clap::Parser;
 use dzp::DzpConverter;
+use image::ImageReader;
 use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,6 +23,13 @@ struct Args {
 
 pub fn main() {
     let args = Args::parse();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .with_writer(std::io::stdout)
+        .init();
 
     let jpg_files: Vec<_> = fs::read_dir(&args.input_path)
         .unwrap()
@@ -45,8 +54,11 @@ pub fn main() {
             .output_path
             .join(jpg_path.with_extension("dzp").file_name().unwrap());
 
-        let jpeg_data = std::fs::read(jpg_path).unwrap();
-        let image: image::RgbImage = turbojpeg::decompress_image(&jpeg_data).unwrap();
+        let image = ImageReader::open(&jpg_path)
+            .unwrap()
+            .decode()
+            .unwrap()
+            .into_rgb8();
 
         let encoding_time = now.elapsed();
 
