@@ -15,7 +15,7 @@ ndarray = "0.16"
 ndarray-stats = "0.5"
 rayon = "1.10"
 thiserror = "1"
-zip = "2"
+zip = "9.0.4"
 clap = { version = "4.5.6", features = ["derive"] }
 webp = "0.3.1"
 tracing = "0.1.41"
